@@ -1,0 +1,338 @@
+<?xml version="1.0"?>
+<sdf version="1.6">
+  <world name="default">
+    <plugin filename="gz-sim-physics-system" name="gz::sim::systems::Physics"/>
+    <plugin filename="gz-sim-user-commands-system" name="gz::sim::systems::UserCommands"/>
+    <plugin filename="gz-sim-scene-broadcaster-system" name="gz::sim::systems::SceneBroadcaster"/>
+    <plugin filename="gz-sim-sensors-system" name="gz::sim::systems::Sensors">
+      <render_engine>ogre2</render_engine>
+    </plugin>
+    <plugin filename="gz-sim-imu-system" name="gz::sim::systems::Imu"/>
+
+    <include>
+      <uri>https://fuel.gazebosim.org/1.0/OpenRobotics/models/Ground Plane</uri>
+    </include>
+    <include>
+      <uri>https://fuel.gazebosim.org/1.0/OpenRobotics/models/Sun</uri>
+    </include>
+
+    <gui fullscreen='0'>
+      <camera name='user_camera'>
+        <pose>0 0 12 0 1.5708 0</pose>
+        <view_controller>orbit</view_controller>
+      </camera>
+    </gui>
+
+    <physics type="ode">
+      <real_time_update_rate>1000.0</real_time_update_rate>
+      <max_step_size>0.001</max_step_size>
+      <real_time_factor>1</real_time_factor>
+      <ode>
+        <solver>
+          <type>quick</type>
+          <iters>150</iters>
+          <sor>1.4</sor>
+          <use_dynamic_moi_rescaling>1</use_dynamic_moi_rescaling>
+        </solver>
+      </ode>
+    </physics>
+
+    <!-- ============================================================ -->
+    <!-- Template Maze with Objectives — CDE2310                      -->
+    <!-- Arena: 6m x 4m                                               -->
+    <!-- Robot spawns top-left (-2.5, 1.5)                            -->
+    <!--                                                              -->
+    <!-- Top-down view (S=start, G=end, #=wall):                      -->
+    <!--                                                              -->
+    <!--  (-3,2)                                       (3,2)          -->
+    <!--  +--#####-------+-----------+#------+---------+              -->
+    <!--  |  START       |           #       |  SHELF  |              -->
+    <!--  |   S          |           #       | Obj C   |              -->
+    <!--  +###-   --##---+           #       |         |              -->
+    <!--  |         #                #       +---------+              -->
+    <!--  | UNKNOWN  #    . . . . .  #  . . . . . . .  |              -->
+    <!--  |  ZONE    #               ############ EAST |              -->
+    <!--  |  ObjAB   #    . . . . .   . ObjAB . . . . |              -->
+    <!--  |    ######+               #  BONUS END      |              -->
+    <!--  |          |      END      #                 |              -->
+    <!--  |          |    (NO BONUS) #                 |              -->
+    <!--  +----------+--------------+#-----------------+              -->
+    <!--  (-3,-2)                                      (3,-2)         -->
+    <!-- ============================================================ -->
+
+    <!-- Floor -->
+    <model name="maze_floor">
+      <static>true</static>
+      <link name="link">
+        <visual name="vis">
+          <pose>0 0 0.001 0 0 0</pose>
+          <geometry><box><size>6 4 0.002</size></box></geometry>
+          <material>
+            <ambient>0.25 0.25 0.28 1</ambient>
+            <diffuse>0.25 0.25 0.28 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- ==================== OUTER WALLS ==================== -->
+    <model name="outer_n">
+      <static>true</static>
+      <link name="link">
+        <pose>0 2.0 0.25 0 0 0</pose>
+        <collision name="col"><geometry><box><size>6.2 0.1 0.5</size></box></geometry></collision>
+        <visual name="vis"><geometry><box><size>6.2 0.1 0.5</size></box></geometry>
+          <material><ambient>0.5 0.5 0.45 1</ambient><diffuse>0.5 0.5 0.45 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="outer_s">
+      <static>true</static>
+      <link name="link">
+        <pose>0 -2.0 0.25 0 0 0</pose>
+        <collision name="col"><geometry><box><size>6.2 0.1 0.5</size></box></geometry></collision>
+        <visual name="vis"><geometry><box><size>6.2 0.1 0.5</size></box></geometry>
+          <material><ambient>0.5 0.5 0.45 1</ambient><diffuse>0.5 0.5 0.45 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="outer_e">
+      <static>true</static>
+      <link name="link">
+        <pose>3.0 0 0.25 0 0 0</pose>
+        <collision name="col"><geometry><box><size>0.1 4.2 0.5</size></box></geometry></collision>
+        <visual name="vis"><geometry><box><size>0.1 4.2 0.5</size></box></geometry>
+          <material><ambient>0.5 0.5 0.45 1</ambient><diffuse>0.5 0.5 0.45 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="outer_w">
+      <static>true</static>
+      <link name="link">
+        <pose>-3.0 0 0.25 0 0 0</pose>
+        <collision name="col"><geometry><box><size>0.1 4.2 0.5</size></box></geometry></collision>
+        <visual name="vis"><geometry><box><size>0.1 4.2 0.5</size></box></geometry>
+          <material><ambient>0.5 0.5 0.45 1</ambient><diffuse>0.5 0.5 0.45 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- ==================== STARTING AREA ==================== -->
+    <!-- Partially enclosed pocket at top-left -->
+    <!-- South wall of starting area (left segment) -->
+    <model name="start_wall_s_left">
+      <static>true</static>
+      <link name="link">
+        <pose>-2.5 0.8 0.25 0 0 0</pose>
+        <collision name="c"><geometry><box><size>1.0 0.1 0.5</size></box></geometry></collision>
+        <visual name="v"><geometry><box><size>1.0 0.1 0.5</size></box></geometry>
+          <material><ambient>0.4 0.45 0.55 1</ambient><diffuse>0.4 0.45 0.55 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <!-- South wall of starting area (right segment, connects to unknown zone wall) -->
+    <model name="start_wall_s_right">
+      <static>true</static>
+      <link name="link">
+        <pose>-1.0 0.8 0.25 0 0 0</pose>
+        <collision name="c"><geometry><box><size>0.4 0.1 0.5</size></box></geometry></collision>
+        <visual name="v"><geometry><box><size>0.4 0.1 0.5</size></box></geometry>
+          <material><ambient>0.4 0.45 0.55 1</ambient><diffuse>0.4 0.45 0.55 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <!-- 0.8m gap between x=-2.0 and x=-1.2 for robot to exit starting area -->
+
+    <!-- ==================== UNKNOWN ZONE BOUNDARY ==================== -->
+    <!-- Vertical wall forming east edge of unknown zone -->
+    <!-- Lower section: y from -2.0 to -0.2 -->
+    <model name="uz_wall_lower">
+      <static>true</static>
+      <link name="link">
+        <pose>-0.8 -1.1 0.25 0 0 0</pose>
+        <collision name="c"><geometry><box><size>0.1 1.8 0.5</size></box></geometry></collision>
+        <visual name="v"><geometry><box><size>0.1 1.8 0.5</size></box></geometry>
+          <material><ambient>0.4 0.45 0.55 1</ambient><diffuse>0.4 0.45 0.55 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <!-- Gap from y=-0.2 to y=0.8 (1.0m passage into/out of unknown zone) -->
+
+    <!-- ==================== CENTRAL MAZE WALLS ==================== -->
+    <!-- Vertical tab from north wall — forces detour -->
+    <model name="tab_n">
+      <static>true</static>
+      <link name="link">
+        <pose>0.5 1.25 0.25 0 0 0</pose>
+        <collision name="c"><geometry><box><size>0.1 1.5 0.5</size></box></geometry></collision>
+        <visual name="v"><geometry><box><size>0.1 1.5 0.5</size></box></geometry>
+          <material><ambient>0.4 0.45 0.55 1</ambient><diffuse>0.4 0.45 0.55 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Vertical tab from south wall -->
+    <model name="tab_s">
+      <static>true</static>
+      <link name="link">
+        <pose>0.5 -1.25 0.25 0 0 0</pose>
+        <collision name="c"><geometry><box><size>0.1 1.5 0.5</size></box></geometry></collision>
+        <visual name="v"><geometry><box><size>0.1 1.5 0.5</size></box></geometry>
+          <material><ambient>0.4 0.45 0.55 1</ambient><diffuse>0.4 0.45 0.55 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Horizontal tab from east wall — creates right-side corridor -->
+    <model name="tab_e">
+      <static>true</static>
+      <link name="link">
+        <pose>2.25 0.0 0.25 0 0 0</pose>
+        <collision name="c"><geometry><box><size>1.5 0.1 0.5</size></box></geometry></collision>
+        <visual name="v"><geometry><box><size>1.5 0.1 0.5</size></box></geometry>
+          <material><ambient>0.4 0.45 0.55 1</ambient><diffuse>0.4 0.45 0.55 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- ==================== SHELF AREA (upper right) ==================== -->
+    <!-- Simplified shelf/rack structure for Mission Objective C -->
+    <model name="shelf_west_wall">
+      <static>true</static>
+      <link name="link">
+        <pose>1.8 1.5 0.25 0 0 0</pose>
+        <collision name="c"><geometry><box><size>0.1 1.0 0.5</size></box></geometry></collision>
+        <visual name="v"><geometry><box><size>0.1 1.0 0.5</size></box></geometry>
+          <material><ambient>0.4 0.45 0.55 1</ambient><diffuse>0.4 0.45 0.55 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <model name="shelf_south_wall">
+      <static>true</static>
+      <link name="link">
+        <pose>2.15 1.0 0.25 0 0 0</pose>
+        <collision name="c"><geometry><box><size>0.7 0.1 0.5</size></box></geometry></collision>
+        <visual name="v"><geometry><box><size>0.7 0.1 0.5</size></box></geometry>
+          <material><ambient>0.4 0.45 0.55 1</ambient><diffuse>0.4 0.45 0.55 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <!-- Shelf rack visual (dark frame) -->
+    <model name="shelf_rack">
+      <static>true</static>
+      <link name="link">
+        <pose>2.4 1.5 0.3 0 0 0</pose>
+        <visual name="shelf_base">
+          <geometry><box><size>0.6 0.6 0.6</size></box></geometry>
+          <material>
+            <ambient>0.15 0.15 0.15 1</ambient>
+            <diffuse>0.2 0.2 0.2 1</diffuse>
+          </material>
+        </visual>
+        <collision name="shelf_col">
+          <geometry><box><size>0.6 0.6 0.6</size></box></geometry>
+        </collision>
+      </link>
+    </model>
+
+    <!-- ==================== MARKERS ==================== -->
+    <!-- Start (blue) — top-left pocket -->
+    <model name="start_marker">
+      <static>true</static>
+      <link name="link">
+        <pose>-2.5 1.5 0.005 0 0 0</pose>
+        <visual name="vis">
+          <geometry><box><size>0.4 0.4 0.01</size></box></geometry>
+          <material>
+            <ambient>0.1 0.3 0.9 1</ambient>
+            <diffuse>0.1 0.3 0.95 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- End — no bonus (yellow) — bottom center -->
+    <model name="end_no_bonus_marker">
+      <static>true</static>
+      <link name="link">
+        <pose>0.0 -1.7 0.005 0 0 0</pose>
+        <visual name="vis">
+          <geometry><box><size>0.4 0.4 0.01</size></box></geometry>
+          <material>
+            <ambient>0.9 0.8 0.1 1</ambient>
+            <diffuse>0.95 0.85 0.1 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- End — bonus (green) — right side -->
+    <model name="end_bonus_marker">
+      <static>true</static>
+      <link name="link">
+        <pose>2.2 -1.0 0.005 0 0 0</pose>
+        <visual name="vis">
+          <geometry><box><size>0.4 0.4 0.01</size></box></geometry>
+          <material>
+            <ambient>0.1 0.8 0.2 1</ambient>
+            <diffuse>0.1 0.9 0.2 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- ==================== STATION A — south wall ==================== -->
+    <!-- Milo tin on south wall, facing north (+Y) toward robot -->
+    <!-- Wall inner face at y=-1.925 (wall center -2.0 + half thickness 0.075) -->
+    <model name="station_a_milo">
+      <static>true</static>
+      <pose>0.0 -1.925 0.15 0 0 0</pose>
+      <include>
+        <uri>model://milo_tin</uri>
+      </include>
+    </model>
+    <!-- ArUco marker for Station A, flat against south wall, facing north -->
+    <model name="station_a_aruco">
+      <static>true</static>
+      <pose>0.25 -1.92 0.15 -1.5708 0 0</pose>
+      <include>
+        <uri>model://aruco_marker</uri>
+      </include>
+    </model>
+
+    <!-- ==================== STATION B — east wall ==================== -->
+    <!-- Milo tin on east wall, facing west (-X) toward robot -->
+    <!-- Wall inner face at x=2.925 (wall center 3.0 - half thickness 0.075) -->
+    <model name="station_b_milo">
+      <static>true</static>
+      <pose>2.925 -1.0 0.15 0 0 -1.5708</pose>
+      <include>
+        <uri>model://milo_tin</uri>
+      </include>
+    </model>
+    <!-- ArUco marker for Station B, flat against east wall, facing west -->
+    <model name="station_b_aruco">
+      <static>true</static>
+      <pose>2.92 -0.75 0.15 1.5708 0 -1.5708</pose>
+      <include>
+        <uri>model://aruco_marker</uri>
+      </include>
+    </model>
+
+    <!-- Mission Objective C (red) — shelf area, upper right -->
+    <model name="obj_c_marker">
+      <static>true</static>
+      <link name="link">
+        <pose>2.4 1.5 0.005 0 0 0</pose>
+        <visual name="vis">
+          <geometry><box><size>0.4 0.4 0.01</size></box></geometry>
+          <material>
+            <ambient>0.9 0.1 0.1 1</ambient>
+            <diffuse>0.95 0.1 0.1 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+  </world>
+</sdf>

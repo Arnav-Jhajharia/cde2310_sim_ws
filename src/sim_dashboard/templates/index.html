@@ -1,0 +1,942 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TurtleBot3 Dashboard</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background: #0f1117;
+    color: #e1e4e8;
+    min-height: 100vh;
+  }
+
+  header {
+    background: #161b22;
+    border-bottom: 1px solid #30363d;
+    padding: 12px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  header h1 { font-size: 18px; font-weight: 600; }
+  .status-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: #3fb950; display: inline-block; margin-right: 8px;
+  }
+
+  .container { padding: 16px; max-width: 1600px; margin: 0 auto; }
+
+  /* Camera feeds */
+  .cameras {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+  .cam-card {
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  .cam-label {
+    padding: 8px 12px;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #8b949e;
+    border-bottom: 1px solid #30363d;
+  }
+  .cam-card img {
+    width: 100%;
+    height: auto;
+    display: block;
+    background: #000;
+  }
+
+  /* Bottom panels */
+  .panels {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr 1fr;
+    gap: 12px;
+  }
+  .panel {
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 8px;
+    padding: 16px;
+  }
+  .panel h2 {
+    font-size: 13px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #8b949e;
+    margin-bottom: 12px;
+  }
+
+  /* Teleop - main layout */
+  .teleop-layout {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+  .teleop-left { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+  .teleop-right { display: flex; flex-direction: column; gap: 10px; }
+
+  /* Virtual joystick */
+  .joystick-wrap { position: relative; }
+  #joystick-canvas {
+    background: #0d1117;
+    border-radius: 50%;
+    border: 2px solid #30363d;
+    cursor: crosshair;
+    touch-action: none;
+  }
+
+  /* 8-dir D-pad */
+  .dpad {
+    display: grid;
+    grid-template-columns: repeat(3, 44px);
+    grid-template-rows: repeat(3, 44px);
+    gap: 4px;
+    justify-content: center;
+  }
+  .dpad-btn {
+    background: #21262d;
+    border: 1px solid #30363d;
+    border-radius: 6px;
+    color: #e1e4e8;
+    font-size: 16px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.1s;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  .dpad-btn:hover { background: #30363d; }
+  .dpad-btn:active, .dpad-btn.active { background: #1f6feb; border-color: #1f6feb; }
+  .dpad-btn.empty { background: transparent; border-color: transparent; cursor: default; }
+
+  /* E-STOP */
+  .estop-btn {
+    width: 100%;
+    padding: 12px;
+    background: #da3633;
+    border: 2px solid #f85149;
+    border-radius: 8px;
+    color: #fff;
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    transition: background 0.1s;
+  }
+  .estop-btn:hover { background: #f85149; }
+  .estop-btn:active { background: #b62324; }
+
+  /* Sliders */
+  .slider-group { width: 100%; }
+  .slider-group label {
+    display: flex;
+    justify-content: space-between;
+    font-size: 11px;
+    color: #8b949e;
+    margin-bottom: 2px;
+  }
+  .slider-group input[type=range] {
+    width: 100%;
+    accent-color: #1f6feb;
+    height: 6px;
+  }
+  .slider-val {
+    font-family: monospace;
+    font-size: 13px;
+    color: #e1e4e8;
+    font-weight: 600;
+  }
+
+  /* Speed presets */
+  .speed-presets {
+    display: flex;
+    gap: 4px;
+  }
+  .speed-preset-btn {
+    flex: 1;
+    padding: 5px 2px;
+    background: #21262d;
+    border: 1px solid #30363d;
+    border-radius: 4px;
+    color: #8b949e;
+    font-size: 10px;
+    cursor: pointer;
+    text-align: center;
+    transition: all 0.1s;
+  }
+  .speed-preset-btn:hover { background: #30363d; color: #e1e4e8; }
+  .speed-preset-btn.active { background: #1f6feb; border-color: #1f6feb; color: #fff; }
+
+  /* Live velocity readout */
+  .live-vel {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+  }
+  .live-vel-item {
+    background: #0d1117;
+    border-radius: 4px;
+    padding: 6px 8px;
+    text-align: center;
+  }
+  .live-vel-item .lv-label { font-size: 9px; color: #484f58; text-transform: uppercase; }
+  .live-vel-item .lv-value { font-family: monospace; font-size: 15px; font-weight: 700; }
+  .lv-positive { color: #3fb950; }
+  .lv-negative { color: #f85149; }
+  .lv-zero { color: #484f58; }
+
+  /* Custom move */
+  .custom-move {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 4px;
+    align-items: end;
+  }
+  .custom-move label { font-size: 10px; color: #8b949e; display: block; margin-bottom: 2px; }
+  .custom-move input[type=number] {
+    width: 100%;
+    padding: 5px 6px;
+    background: #0d1117;
+    border: 1px solid #30363d;
+    border-radius: 4px;
+    color: #e1e4e8;
+    font-family: monospace;
+    font-size: 12px;
+  }
+  .custom-move input[type=number]:focus { outline: none; border-color: #1f6feb; }
+  .go-btn {
+    padding: 5px 10px;
+    background: #238636;
+    border: 1px solid #2ea043;
+    border-radius: 4px;
+    color: #fff;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .go-btn:hover { background: #2ea043; }
+
+  /* Odom data */
+  .odom-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+  }
+  .odom-item {
+    background: #0d1117;
+    border-radius: 6px;
+    padding: 6px 8px;
+  }
+  .odom-item .label { font-size: 10px; color: #8b949e; }
+  .odom-item .value { font-size: 14px; font-weight: 600; font-family: monospace; }
+
+  /* Nav presets */
+  .nav-btns {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 5px;
+  }
+  .nav-btn {
+    background: #21262d;
+    border: 1px solid #30363d;
+    border-radius: 6px;
+    color: #e1e4e8;
+    font-size: 11px;
+    padding: 7px 4px;
+    cursor: pointer;
+    transition: background 0.15s;
+    text-align: center;
+  }
+  .nav-btn:hover { background: #30363d; }
+  .nav-btn.active { background: #1f6feb; border-color: #1f6feb; }
+  .nav-cancel {
+    grid-column: 1 / -1;
+    background: #da3633 !important;
+    border-color: #da3633 !important;
+    font-weight: 600;
+  }
+  .nav-cancel:hover { background: #f85149 !important; }
+
+  /* LiDAR */
+  .lidar-container { text-align: center; }
+  #lidar-canvas {
+    background: #0d1117;
+    border-radius: 6px;
+    border: 1px solid #30363d;
+  }
+
+  /* Keyboard hint */
+  .kb-hint {
+    font-size: 10px;
+    color: #484f58;
+    line-height: 1.6;
+    text-align: center;
+  }
+  .kb-hint kbd {
+    background: #21262d;
+    border: 1px solid #30363d;
+    border-radius: 3px;
+    padding: 0px 4px;
+    font-family: monospace;
+    font-size: 10px;
+  }
+
+  /* Section dividers */
+  .section-divider {
+    border: none;
+    border-top: 1px solid #21262d;
+    margin: 8px 0;
+  }
+
+  @media (max-width: 1100px) {
+    .panels { grid-template-columns: 1fr 1fr; }
+  }
+  @media (max-width: 700px) {
+    .cameras { grid-template-columns: 1fr; }
+    .panels { grid-template-columns: 1fr; }
+    .teleop-layout { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div><span class="status-dot"></span><h1 style="display:inline">TurtleBot3 Dashboard</h1></div>
+  <div style="font-size:12px;color:#8b949e" id="conn-status">Connected</div>
+</header>
+
+<div class="container">
+  <!-- Camera Feeds -->
+  <div class="cameras">
+    <div class="cam-card">
+      <div class="cam-label">Left Camera</div>
+      <img src="/stream/left" alt="Left camera feed">
+    </div>
+    <div class="cam-card">
+      <div class="cam-label">Front Camera</div>
+      <img src="/stream/front" alt="Front camera feed">
+    </div>
+    <div class="cam-card">
+      <div class="cam-label">Right Camera</div>
+      <img src="/stream/right" alt="Right camera feed">
+    </div>
+  </div>
+
+  <!-- Bottom Panels -->
+  <div class="panels">
+
+    <!-- TELEOP CONTROL (wide panel) -->
+    <div class="panel">
+      <h2>Teleop Control</h2>
+      <div class="teleop-layout">
+        <!-- Left: Joystick + D-pad -->
+        <div class="teleop-left">
+          <div class="joystick-wrap">
+            <canvas id="joystick-canvas" width="160" height="160"></canvas>
+          </div>
+          <div class="dpad">
+            <div class="dpad-btn" data-dir="fwd-left" id="btn-fl">&#8598;</div>
+            <div class="dpad-btn" data-dir="forward" id="btn-fwd">&#9650;</div>
+            <div class="dpad-btn" data-dir="fwd-right" id="btn-fr">&#8599;</div>
+            <div class="dpad-btn" data-dir="left" id="btn-left">&#9664;</div>
+            <div class="dpad-btn estop-btn" data-dir="stop" id="btn-stop" style="font-size:9px;padding:0;border-width:1px;">STOP</div>
+            <div class="dpad-btn" data-dir="right" id="btn-right">&#9654;</div>
+            <div class="dpad-btn" data-dir="bwd-left" id="btn-bl">&#8601;</div>
+            <div class="dpad-btn" data-dir="backward" id="btn-bwd">&#9660;</div>
+            <div class="dpad-btn" data-dir="bwd-right" id="btn-br">&#8600;</div>
+          </div>
+        </div>
+
+        <!-- Right: Sliders + presets + live vel + custom -->
+        <div class="teleop-right">
+          <!-- Live velocity readout -->
+          <div class="live-vel">
+            <div class="live-vel-item">
+              <div class="lv-label">Sending Linear</div>
+              <div class="lv-value lv-zero" id="lv-lin">0.000</div>
+            </div>
+            <div class="live-vel-item">
+              <div class="lv-label">Sending Angular</div>
+              <div class="lv-value lv-zero" id="lv-ang">0.000</div>
+            </div>
+          </div>
+
+          <!-- Linear speed slider -->
+          <div class="slider-group">
+            <label>Linear Speed <span class="slider-val" id="lin-speed-val">0.20</span> m/s</label>
+            <input type="range" min="0.02" max="0.80" step="0.02" value="0.20" id="lin-speed-slider">
+          </div>
+
+          <!-- Angular speed slider -->
+          <div class="slider-group">
+            <label>Angular Speed <span class="slider-val" id="ang-speed-val">1.00</span> rad/s</label>
+            <input type="range" min="0.1" max="2.84" step="0.1" value="1.00" id="ang-speed-slider">
+          </div>
+
+          <!-- Speed presets -->
+          <div class="speed-presets">
+            <div class="speed-preset-btn" data-lin="0.05" data-ang="0.3">Crawl</div>
+            <div class="speed-preset-btn" data-lin="0.12" data-ang="0.6">Slow</div>
+            <div class="speed-preset-btn active" data-lin="0.20" data-ang="1.0">Normal</div>
+            <div class="speed-preset-btn" data-lin="0.40" data-ang="1.8">Fast</div>
+            <div class="speed-preset-btn" data-lin="0.80" data-ang="2.84">Max</div>
+          </div>
+
+          <hr class="section-divider">
+
+          <!-- Custom distance -->
+          <div class="custom-move">
+            <div>
+              <label>Drive distance (m)</label>
+              <input type="number" id="custom-dist" value="0.5" step="0.1" min="0.1" max="10">
+            </div>
+            <button class="go-btn" id="go-dist">Go</button>
+          </div>
+
+          <!-- Custom rotation -->
+          <div class="custom-move">
+            <div>
+              <label>Rotate angle (deg)</label>
+              <input type="number" id="custom-angle" value="90" step="15" min="-360" max="360">
+            </div>
+            <button class="go-btn" id="go-angle">Go</button>
+          </div>
+
+          <hr class="section-divider">
+
+          <!-- E-STOP -->
+          <button class="estop-btn" id="estop">Emergency Stop</button>
+
+          <!-- Keyboard hints -->
+          <div class="kb-hint">
+            <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> move &nbsp;
+            <kbd>Q</kbd><kbd>E</kbd> rotate &nbsp;
+            <kbd>Space</kbd> stop<br>
+            <kbd>Shift</kbd> boost &nbsp;
+            <kbd>1</kbd>-<kbd>5</kbd> speed presets &nbsp;
+            Joystick: drag
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Robot Status -->
+    <div class="panel">
+      <h2>Robot Status</h2>
+      <div class="odom-grid">
+        <div class="odom-item"><div class="label">Position X</div><div class="value" id="pos-x">--</div></div>
+        <div class="odom-item"><div class="label">Position Y</div><div class="value" id="pos-y">--</div></div>
+        <div class="odom-item"><div class="label">Linear Vel</div><div class="value" id="vel-x">--</div></div>
+        <div class="odom-item"><div class="label">Angular Vel</div><div class="value" id="vel-wz">--</div></div>
+        <div class="odom-item"><div class="label">Orient. Z</div><div class="value" id="ori-z">--</div></div>
+        <div class="odom-item"><div class="label">Orient. W</div><div class="value" id="ori-w">--</div></div>
+        <div class="odom-item"><div class="label">Heading</div><div class="value" id="heading">--</div></div>
+        <div class="odom-item"><div class="label">Position Z</div><div class="value" id="pos-z">--</div></div>
+      </div>
+
+      <hr class="section-divider" style="margin:12px 0">
+      <h2>Navigation Presets</h2>
+      <div class="nav-btns">
+        <div class="nav-btn" data-preset="forward_1m">Fwd 1m</div>
+        <div class="nav-btn" data-preset="backward_1m">Back 1m</div>
+        <div class="nav-btn" data-preset="turn_left_90">Left 90</div>
+        <div class="nav-btn" data-preset="turn_right_90">Right 90</div>
+        <div class="nav-btn" data-preset="turn_around">Turn 180</div>
+        <div class="nav-btn" data-preset="explore_square">Square</div>
+        <div class="nav-btn" data-preset="explore_room">Room</div>
+        <div class="nav-btn" data-preset="wander">Wander</div>
+        <div class="nav-btn nav-cancel" id="nav-cancel">Cancel Nav</div>
+      </div>
+    </div>
+
+    <!-- LiDAR -->
+    <div class="panel">
+      <h2>LiDAR View</h2>
+      <div class="lidar-container">
+        <canvas id="lidar-canvas" width="280" height="280"></canvas>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ==========================================================================
+// Teleop Engine
+// ==========================================================================
+
+let linSpeed = 0.20;
+let angSpeed = 1.00;
+let currentLin = 0;
+let currentAng = 0;
+let boostActive = false;
+
+const linSlider = document.getElementById('lin-speed-slider');
+const angSlider = document.getElementById('ang-speed-slider');
+const linVal = document.getElementById('lin-speed-val');
+const angVal = document.getElementById('ang-speed-val');
+const lvLin = document.getElementById('lv-lin');
+const lvAng = document.getElementById('lv-ang');
+
+linSlider.oninput = function() { linSpeed = parseFloat(this.value); linVal.textContent = this.value; };
+angSlider.oninput = function() { angSpeed = parseFloat(this.value); angVal.textContent = this.value; };
+
+function sendCmd(linear, angular) {
+  currentLin = linear;
+  currentAng = angular;
+  updateLiveVel();
+  fetch('/api/cmd_vel', {
+    method: 'POST',
+    body: JSON.stringify({ linear, angular }),
+  }).catch(() => {});
+}
+
+function updateLiveVel() {
+  const fmt = (v) => (v >= 0 ? ' ' : '') + v.toFixed(3);
+  lvLin.textContent = fmt(currentLin);
+  lvAng.textContent = fmt(currentAng);
+  lvLin.className = 'lv-value ' + (currentLin > 0 ? 'lv-positive' : currentLin < 0 ? 'lv-negative' : 'lv-zero');
+  lvAng.className = 'lv-value ' + (currentAng > 0 ? 'lv-positive' : currentAng < 0 ? 'lv-negative' : 'lv-zero');
+}
+
+function getLinSpeed() { return boostActive ? Math.min(linSpeed * 2, 0.80) : linSpeed; }
+function getAngSpeed() { return boostActive ? Math.min(angSpeed * 2, 2.84) : angSpeed; }
+
+// Direction map (supports 8 directions + pure rotate)
+const dirFns = {
+  'forward':   () => sendCmd(getLinSpeed(), 0),
+  'backward':  () => sendCmd(-getLinSpeed(), 0),
+  'left':      () => sendCmd(0, getAngSpeed()),
+  'right':     () => sendCmd(0, -getAngSpeed()),
+  'fwd-left':  () => sendCmd(getLinSpeed(), getAngSpeed()),
+  'fwd-right': () => sendCmd(getLinSpeed(), -getAngSpeed()),
+  'bwd-left':  () => sendCmd(-getLinSpeed(), getAngSpeed()),
+  'bwd-right': () => sendCmd(-getLinSpeed(), -getAngSpeed()),
+  'stop':      () => sendCmd(0, 0),
+};
+
+// --------------------------------------------------------------------------
+// Speed presets
+// --------------------------------------------------------------------------
+document.querySelectorAll('.speed-preset-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.speed-preset-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    const lin = parseFloat(btn.dataset.lin);
+    const ang = parseFloat(btn.dataset.ang);
+    linSlider.value = lin; linSpeed = lin; linVal.textContent = lin.toFixed(2);
+    angSlider.value = ang; angSpeed = ang; angVal.textContent = ang.toFixed(1);
+  });
+});
+
+// --------------------------------------------------------------------------
+// D-pad buttons (8 directions)
+// --------------------------------------------------------------------------
+document.querySelectorAll('.dpad-btn[data-dir]').forEach(btn => {
+  const dir = btn.dataset.dir;
+  let interval = null;
+  const start = () => {
+    if (dirFns[dir]) dirFns[dir]();
+    btn.classList.add('active');
+    if (dir !== 'stop') interval = setInterval(() => dirFns[dir](), 80);
+  };
+  const stop = () => {
+    clearInterval(interval);
+    btn.classList.remove('active');
+    if (dir !== 'stop') sendCmd(0, 0);
+  };
+  btn.addEventListener('mousedown', start);
+  btn.addEventListener('mouseup', stop);
+  btn.addEventListener('mouseleave', stop);
+  btn.addEventListener('touchstart', e => { e.preventDefault(); start(); });
+  btn.addEventListener('touchend', e => { e.preventDefault(); stop(); });
+});
+
+// --------------------------------------------------------------------------
+// E-STOP
+// --------------------------------------------------------------------------
+document.getElementById('estop').addEventListener('click', () => {
+  sendCmd(0, 0);
+  // Also cancel any running nav
+  fetch('/api/nav/cancel', { method: 'POST' }).catch(() => {});
+});
+
+// --------------------------------------------------------------------------
+// Virtual Joystick
+// --------------------------------------------------------------------------
+const joyCanvas = document.getElementById('joystick-canvas');
+const joyCtx = joyCanvas.getContext('2d');
+const joyR = joyCanvas.width / 2;
+let joyActive = false;
+let joyX = 0, joyY = 0; // -1 to 1
+let joySendInterval = null;
+
+function drawJoystick() {
+  const w = joyCanvas.width, h = joyCanvas.height;
+  const cx = w / 2, cy = h / 2;
+  const maxR = joyR - 12;
+
+  joyCtx.clearRect(0, 0, w, h);
+
+  // Background circle
+  joyCtx.fillStyle = '#0d1117';
+  joyCtx.beginPath();
+  joyCtx.arc(cx, cy, joyR - 2, 0, Math.PI * 2);
+  joyCtx.fill();
+
+  // Crosshairs
+  joyCtx.strokeStyle = '#21262d';
+  joyCtx.lineWidth = 1;
+  joyCtx.beginPath();
+  joyCtx.moveTo(cx, cy - maxR); joyCtx.lineTo(cx, cy + maxR);
+  joyCtx.moveTo(cx - maxR, cy); joyCtx.lineTo(cx + maxR, cy);
+  joyCtx.stroke();
+
+  // Dead zone circle
+  joyCtx.strokeStyle = '#30363d';
+  joyCtx.lineWidth = 0.5;
+  joyCtx.beginPath();
+  joyCtx.arc(cx, cy, maxR * 0.15, 0, Math.PI * 2);
+  joyCtx.stroke();
+
+  // Range ring
+  joyCtx.strokeStyle = '#30363d';
+  joyCtx.beginPath();
+  joyCtx.arc(cx, cy, maxR, 0, Math.PI * 2);
+  joyCtx.stroke();
+
+  // Stick position
+  const stickX = cx + joyX * maxR;
+  const stickY = cy - joyY * maxR;
+
+  // Line from center to stick
+  if (joyActive || (joyX !== 0 || joyY !== 0)) {
+    joyCtx.strokeStyle = '#1f6feb';
+    joyCtx.lineWidth = 2;
+    joyCtx.beginPath();
+    joyCtx.moveTo(cx, cy);
+    joyCtx.lineTo(stickX, stickY);
+    joyCtx.stroke();
+  }
+
+  // Stick knob
+  const knobColor = joyActive ? '#1f6feb' : '#30363d';
+  joyCtx.fillStyle = knobColor;
+  joyCtx.beginPath();
+  joyCtx.arc(stickX, stickY, 14, 0, Math.PI * 2);
+  joyCtx.fill();
+  joyCtx.strokeStyle = joyActive ? '#58a6ff' : '#484f58';
+  joyCtx.lineWidth = 2;
+  joyCtx.stroke();
+}
+
+function joyFromEvent(e) {
+  const rect = joyCanvas.getBoundingClientRect();
+  const cx = rect.width / 2;
+  const cy = rect.height / 2;
+  const maxR = joyR - 12;
+
+  let clientX, clientY;
+  if (e.touches) {
+    clientX = e.touches[0].clientX;
+    clientY = e.touches[0].clientY;
+  } else {
+    clientX = e.clientX;
+    clientY = e.clientY;
+  }
+
+  let dx = (clientX - rect.left - cx) / maxR;
+  let dy = -(clientY - rect.top - cy) / maxR;
+
+  // Clamp to unit circle
+  const dist = Math.sqrt(dx * dx + dy * dy);
+  if (dist > 1) { dx /= dist; dy /= dist; }
+
+  // Dead zone
+  if (dist < 0.15) { dx = 0; dy = 0; }
+
+  joyX = dx;
+  joyY = dy;
+  drawJoystick();
+}
+
+function joyStart(e) {
+  e.preventDefault();
+  joyActive = true;
+  joyFromEvent(e);
+  joySendInterval = setInterval(() => {
+    // Y = linear (forward/back), X = angular (left/right inverted)
+    const lin = joyY * getLinSpeed();
+    const ang = -joyX * getAngSpeed();
+    sendCmd(lin, ang);
+  }, 80);
+}
+
+function joyMove(e) {
+  if (!joyActive) return;
+  e.preventDefault();
+  joyFromEvent(e);
+}
+
+function joyEnd(e) {
+  if (!joyActive) return;
+  joyActive = false;
+  joyX = 0; joyY = 0;
+  clearInterval(joySendInterval);
+  sendCmd(0, 0);
+  drawJoystick();
+}
+
+joyCanvas.addEventListener('mousedown', joyStart);
+joyCanvas.addEventListener('mousemove', joyMove);
+joyCanvas.addEventListener('mouseup', joyEnd);
+joyCanvas.addEventListener('mouseleave', joyEnd);
+joyCanvas.addEventListener('touchstart', joyStart);
+joyCanvas.addEventListener('touchmove', joyMove);
+joyCanvas.addEventListener('touchend', joyEnd);
+
+drawJoystick();
+
+// --------------------------------------------------------------------------
+// Keyboard (WASD + QE rotate + Shift boost + 1-5 presets)
+// --------------------------------------------------------------------------
+const keyDirMap = {
+  w: 'forward', s: 'backward', a: 'left', d: 'right',
+  q: 'left', e: 'right',  // Q/E for pure rotation
+  ' ': 'stop',
+};
+// Combo support: W+A = fwd-left, etc.
+const keysDown = new Set();
+let keyInterval = null;
+
+function keyComboDir() {
+  const w = keysDown.has('w'), s = keysDown.has('s');
+  const a = keysDown.has('a') || keysDown.has('q');
+  const d = keysDown.has('d') || keysDown.has('e');
+
+  if (w && a) return 'fwd-left';
+  if (w && d) return 'fwd-right';
+  if (s && a) return 'bwd-left';
+  if (s && d) return 'bwd-right';
+  if (w) return 'forward';
+  if (s) return 'backward';
+  if (a || keysDown.has('q')) return 'left';
+  if (d || keysDown.has('e')) return 'right';
+  return null;
+}
+
+function updateFromKeys() {
+  const dir = keyComboDir();
+  if (dir && dirFns[dir]) {
+    dirFns[dir]();
+    // Highlight matching button
+    document.querySelectorAll('.dpad-btn.active').forEach(b => b.classList.remove('active'));
+    const btnId = {
+      'forward': 'btn-fwd', 'backward': 'btn-bwd', 'left': 'btn-left', 'right': 'btn-right',
+      'fwd-left': 'btn-fl', 'fwd-right': 'btn-fr', 'bwd-left': 'btn-bl', 'bwd-right': 'btn-br',
+    }[dir];
+    if (btnId) document.getElementById(btnId).classList.add('active');
+  }
+}
+
+document.addEventListener('keydown', e => {
+  // Don't capture when typing in inputs
+  if (e.target.tagName === 'INPUT') return;
+
+  const key = e.key.toLowerCase();
+
+  // Shift = boost
+  if (e.key === 'Shift') { boostActive = true; return; }
+
+  // Number keys for speed presets
+  if (key >= '1' && key <= '5') {
+    const presetBtns = document.querySelectorAll('.speed-preset-btn');
+    const idx = parseInt(key) - 1;
+    if (presetBtns[idx]) presetBtns[idx].click();
+    return;
+  }
+
+  // Space = stop
+  if (key === ' ') {
+    e.preventDefault();
+    sendCmd(0, 0);
+    document.querySelectorAll('.dpad-btn.active').forEach(b => b.classList.remove('active'));
+    document.getElementById('btn-stop').classList.add('active');
+    setTimeout(() => document.getElementById('btn-stop').classList.remove('active'), 200);
+    return;
+  }
+
+  if ('wasdeq'.includes(key) && !keysDown.has(key)) {
+    keysDown.add(key);
+    updateFromKeys();
+    if (!keyInterval) {
+      keyInterval = setInterval(updateFromKeys, 80);
+    }
+  }
+});
+
+document.addEventListener('keyup', e => {
+  if (e.key === 'Shift') { boostActive = false; return; }
+  const key = e.key.toLowerCase();
+  if (keysDown.has(key)) {
+    keysDown.delete(key);
+    if (keysDown.size === 0 || !keyComboDir()) {
+      clearInterval(keyInterval);
+      keyInterval = null;
+      sendCmd(0, 0);
+      document.querySelectorAll('.dpad-btn.active').forEach(b => b.classList.remove('active'));
+    } else {
+      updateFromKeys();
+    }
+  }
+});
+
+// --------------------------------------------------------------------------
+// Custom distance / angle
+// --------------------------------------------------------------------------
+document.getElementById('go-dist').addEventListener('click', () => {
+  const dist = parseFloat(document.getElementById('custom-dist').value);
+  if (isNaN(dist) || dist === 0) return;
+  const spd = getLinSpeed();
+  const duration = Math.abs(dist) / spd;
+  const lin = dist > 0 ? spd : -spd;
+  fetch('/api/nav/custom', {
+    method: 'POST',
+    body: JSON.stringify({ linear: lin, angular: 0, duration }),
+  }).catch(() => {});
+});
+
+document.getElementById('go-angle').addEventListener('click', () => {
+  const deg = parseFloat(document.getElementById('custom-angle').value);
+  if (isNaN(deg) || deg === 0) return;
+  const rad = deg * Math.PI / 180;
+  const spd = getAngSpeed();
+  const duration = Math.abs(rad) / spd;
+  const ang = rad > 0 ? spd : -spd;
+  fetch('/api/nav/custom', {
+    method: 'POST',
+    body: JSON.stringify({ linear: 0, angular: ang, duration }),
+  }).catch(() => {});
+});
+
+// --------------------------------------------------------------------------
+// Nav presets
+// --------------------------------------------------------------------------
+document.querySelectorAll('.nav-btn[data-preset]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.nav-btn[data-preset]').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    fetch('/api/nav', {
+      method: 'POST',
+      body: JSON.stringify({ preset: btn.dataset.preset }),
+    }).catch(() => {});
+  });
+});
+document.getElementById('nav-cancel').addEventListener('click', () => {
+  document.querySelectorAll('.nav-btn[data-preset]').forEach(b => b.classList.remove('active'));
+  fetch('/api/nav/cancel', { method: 'POST' }).catch(() => {});
+});
+
+// --------------------------------------------------------------------------
+// Odom polling
+// --------------------------------------------------------------------------
+setInterval(() => {
+  fetch('/api/odom').then(r => r.json()).then(d => {
+    if (d.x !== undefined) {
+      document.getElementById('pos-x').textContent = d.x;
+      document.getElementById('pos-y').textContent = d.y;
+      document.getElementById('pos-z').textContent = d.z;
+      document.getElementById('vel-x').textContent = d.vx;
+      document.getElementById('vel-wz').textContent = d.wz;
+      document.getElementById('ori-z').textContent = d.oz;
+      document.getElementById('ori-w').textContent = d.ow;
+      // Compute heading from quaternion (yaw)
+      const yaw = Math.atan2(2 * (d.ow * d.oz + d.ox * d.oy), 1 - 2 * (d.oy * d.oy + d.oz * d.oz));
+      document.getElementById('heading').textContent = (yaw * 180 / Math.PI).toFixed(1) + '\u00B0';
+    }
+  }).catch(() => {});
+}, 500);
+
+// --------------------------------------------------------------------------
+// LiDAR canvas
+// --------------------------------------------------------------------------
+const canvas = document.getElementById('lidar-canvas');
+const ctx = canvas.getContext('2d');
+
+function drawLidar(data) {
+  const w = canvas.width, h = canvas.height;
+  const cx = w / 2, cy = h / 2;
+  const scale = (w / 2 - 10) / data.range_max;
+
+  ctx.fillStyle = '#0d1117';
+  ctx.fillRect(0, 0, w, h);
+
+  // Range rings
+  ctx.strokeStyle = '#21262d';
+  ctx.lineWidth = 0.5;
+  for (let r = 1; r <= data.range_max; r++) {
+    ctx.beginPath();
+    ctx.arc(cx, cy, r * scale, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
+  // Cross hairs
+  ctx.beginPath();
+  ctx.moveTo(cx, 0); ctx.lineTo(cx, h);
+  ctx.moveTo(0, cy); ctx.lineTo(w, cy);
+  ctx.stroke();
+
+  // LiDAR points
+  ctx.fillStyle = '#3fb950';
+  const ranges = data.ranges;
+  for (let i = 0; i < ranges.length; i++) {
+    const r = ranges[i];
+    if (r < data.range_min || r > data.range_max) continue;
+    const angle = data.angle_min + i * data.angle_increment;
+    const x = cx + r * scale * Math.cos(angle);
+    const y = cy - r * scale * Math.sin(angle);
+    ctx.fillRect(x - 1, y - 1, 3, 3);
+  }
+
+  // Robot marker
+  ctx.fillStyle = '#1f6feb';
+  ctx.beginPath();
+  ctx.arc(cx, cy, 5, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Forward arrow
+  ctx.strokeStyle = '#1f6feb';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(cx, cy);
+  ctx.lineTo(cx + 18, cy);
+  ctx.lineTo(cx + 13, cy - 4);
+  ctx.moveTo(cx + 18, cy);
+  ctx.lineTo(cx + 13, cy + 4);
+  ctx.stroke();
+}
+
+setInterval(() => {
+  fetch('/api/scan').then(r => r.json()).then(d => {
+    if (d.ranges) drawLidar(d);
+  }).catch(() => {});
+}, 500);
+</script>
+
+</body>
+</html>

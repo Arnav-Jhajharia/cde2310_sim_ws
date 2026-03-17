@@ -1,0 +1,159 @@
+<?xml version="1.0"?>
+<sdf version="1.6">
+  <world name="default">
+    <plugin filename="gz-sim-physics-system" name="gz::sim::systems::Physics"/>
+    <plugin filename="gz-sim-user-commands-system" name="gz::sim::systems::UserCommands"/>
+    <plugin filename="gz-sim-scene-broadcaster-system" name="gz::sim::systems::SceneBroadcaster"/>
+    <plugin filename="gz-sim-sensors-system" name="gz::sim::systems::Sensors">
+      <render_engine>ogre2</render_engine>
+    </plugin>
+    <plugin filename="gz-sim-imu-system" name="gz::sim::systems::Imu"/>
+
+    <include>
+      <uri>https://fuel.gazebosim.org/1.0/OpenRobotics/models/Ground Plane</uri>
+    </include>
+    <include>
+      <uri>https://fuel.gazebosim.org/1.0/OpenRobotics/models/Sun</uri>
+    </include>
+
+    <gui fullscreen='0'>
+      <camera name='user_camera'>
+        <pose>0 -6 8 0 0.9 1.57</pose>
+        <view_controller>orbit</view_controller>
+      </camera>
+    </gui>
+
+    <physics type="ode">
+      <real_time_update_rate>1000.0</real_time_update_rate>
+      <max_step_size>0.001</max_step_size>
+      <real_time_factor>1</real_time_factor>
+      <ode>
+        <solver>
+          <type>quick</type>
+          <iters>150</iters>
+          <sor>1.4</sor>
+          <use_dynamic_moi_rescaling>1</use_dynamic_moi_rescaling>
+        </solver>
+      </ode>
+    </physics>
+
+    <!-- ============================================================ -->
+    <!-- Docking Arena: 6m x 6m room with flat walls                  -->
+    <!-- Robot spawns at center (0,0), docking wall is north (+Y)     -->
+    <!-- ============================================================ -->
+
+    <!-- Floor (colored slightly so you can see boundaries) -->
+    <model name="arena_floor">
+      <static>true</static>
+      <link name="floor_link">
+        <visual name="floor_visual">
+          <pose>0 0 0.001 0 0 0</pose>
+          <geometry><box><size>6 6 0.002</size></box></geometry>
+          <material>
+            <ambient>0.3 0.3 0.32 1</ambient>
+            <diffuse>0.3 0.3 0.32 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- North wall (docking wall) - the target wall -->
+    <model name="wall_north">
+      <static>true</static>
+      <link name="link">
+        <pose>0 3.0 1.25 0 0 0</pose>
+        <collision name="col">
+          <geometry><box><size>6 0.15 2.5</size></box></geometry>
+        </collision>
+        <visual name="vis">
+          <geometry><box><size>6 0.15 2.5</size></box></geometry>
+          <material>
+            <ambient>0.9 0.9 0.88 1</ambient>
+            <diffuse>0.9 0.9 0.88 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- South wall -->
+    <model name="wall_south">
+      <static>true</static>
+      <link name="link">
+        <pose>0 -3.0 1.25 0 0 0</pose>
+        <collision name="col">
+          <geometry><box><size>6 0.15 2.5</size></box></geometry>
+        </collision>
+        <visual name="vis">
+          <geometry><box><size>6 0.15 2.5</size></box></geometry>
+          <material>
+            <ambient>0.7 0.7 0.68 1</ambient>
+            <diffuse>0.7 0.7 0.68 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- East wall -->
+    <model name="wall_east">
+      <static>true</static>
+      <link name="link">
+        <pose>3.0 0 1.25 0 0 0</pose>
+        <collision name="col">
+          <geometry><box><size>0.15 6 2.5</size></box></geometry>
+        </collision>
+        <visual name="vis">
+          <geometry><box><size>0.15 6 2.5</size></box></geometry>
+          <material>
+            <ambient>0.7 0.7 0.68 1</ambient>
+            <diffuse>0.7 0.7 0.68 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- West wall -->
+    <model name="wall_west">
+      <static>true</static>
+      <link name="link">
+        <pose>-3.0 0 1.25 0 0 0</pose>
+        <collision name="col">
+          <geometry><box><size>0.15 6 2.5</size></box></geometry>
+        </collision>
+        <visual name="vis">
+          <geometry><box><size>0.15 6 2.5</size></box></geometry>
+          <material>
+            <ambient>0.7 0.7 0.68 1</ambient>
+            <diffuse>0.7 0.7 0.68 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Milo tin can MOUNTED ON north wall -->
+    <!-- STL: Y-axis is cylinder height (0..200mm), X/Z are circular cross-section -->
+    <!-- Scale 0.001 => 0.1345m dia x 0.210m tall -->
+    <!-- Yaw=pi flips STL Y to Gazebo -Y: cylinder sticks out from wall toward robot -->
+    <!-- Wall inner face at y=2.925, tin extends ~0.2m toward robot (to y~2.73) -->
+    <!-- z=0.15 = TurtleBot camera height -->
+    <model name="milo_tin">
+      <static>true</static>
+      <pose>0 2.925 0.15 0 0 3.14159</pose>
+      <include>
+        <uri>model://milo_tin</uri>
+      </include>
+    </model>
+
+    <!-- ArUco marker ID 42 (DICT_4X4_50) on north wall, next to tin -->
+    <!-- Flat against wall: wall face is at y=2.925 (wall center 3.0 - half thickness 0.075) -->
+    <!-- Marker faces south (-Y) so robot can see it approaching from y=0 -->
+    <!-- Rotated: face south = rotate 90 deg around X so marker normal points -Y -->
+    <model name="aruco_marker_42">
+      <static>true</static>
+      <pose>0.25 2.92 0.15 1.5708 0 0</pose>
+      <include>
+        <uri>model://aruco_marker</uri>
+      </include>
+    </model>
+
+  </world>
+</sdf>
