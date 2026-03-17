@@ -1,7 +1,7 @@
 #!/bin/bash
 # Start TurtleBot3 Burger Gazebo simulation
 # Usage: ./start_sim.sh [world]
-#   world: "world" (default), "house", "empty", "dock", or "maze"
+#   world: "world" (default), "house", "empty", "dock", "maze", "template", or "dashboard"
 
 set -e
 
@@ -27,9 +27,13 @@ case "$WORLD" in
     house) LAUNCH="turtlebot3_house.launch.py" ;;
     empty) LAUNCH="empty_world.launch.py" ;;
     dock)  LAUNCH="arena_dock.launch.py" ;;
-    maze)  LAUNCH="arena_maze.launch.py" ;;
+    maze)     LAUNCH="arena_maze.launch.py" ;;
+    template) LAUNCH="arena_template_maze.launch.py" ;;
+    dashboard)
+        exec ~/sim_ws/src/sim_dashboard/run_dashboard.sh "${@:2}"
+        ;;
     *)
-        echo "Unknown world: $WORLD (use: world, house, empty, dock, maze)"
+        echo "Unknown world: $WORLD (use: world, house, empty, dock, maze, template, dashboard)"
         exit 1
         ;;
 esac

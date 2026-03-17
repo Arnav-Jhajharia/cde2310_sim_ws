@@ -1,20 +1,33 @@
 # CDE2310 Simulation Workspace
 
-TurtleBot3 Burger simulation environment with a web dashboard for camera, LIDAR, and teleop control.
+TurtleBot3 Burger simulation with Gazebo, a web dashboard for camera/LIDAR/teleop,
+and an ArUco visual servoing module for autonomous docking.
+
+> **For AI assistants / LLMs**: see [llms.txt](llms.txt) for a complete technical
+> reference of every package, topic, node, launch file, and command in this workspace.
+
+---
 
 ## Prerequisites
 
 - Ubuntu 22.04
-- ROS 2 Humble
-- Gazebo (comes with `ros-humble-desktop`)
-- Python 3.10 with `flask`, `opencv-python`, `cv_bridge`, `numpy`
-
-Install ROS 2 dependencies:
+- ROS 2 Humble (`ros-humble-desktop`)
+- Python 3.10
 
 ```bash
-sudo apt install ros-humble-turtlebot3-msgs ros-humble-cv-bridge
-pip install flask opencv-python
+# ROS dependencies
+sudo apt install \
+  ros-humble-turtlebot3-msgs \
+  ros-humble-cv-bridge \
+  ros-humble-ros-gz-bridge \
+  ros-humble-ros-gz-sim \
+  ros-humble-ros-gz-image
+
+# Python dependencies
+pip install flask opencv-python numpy
 ```
+
+---
 
 ## Setup
 
@@ -26,37 +39,102 @@ colcon build --symlink-install
 source install/setup.bash
 ```
 
-## Running the Simulation
+---
 
-Start a Gazebo world (default is `world`):
+## Running
 
-```bash
-./start_sim.sh          # default world
-./start_sim.sh house    # house world
-./start_sim.sh maze     # maze world
-./start_sim.sh empty    # empty world
-./start_sim.sh dock     # dock world
-```
-
-To kill all sim processes and restart clean:
+### 1. Start the simulation (Terminal 1)
 
 ```bash
-./reset_sim.sh          # restarts with default world
-./reset_sim.sh maze     # restarts with maze world
+./start_sim.sh [WORLD]
 ```
 
-## Web Dashboard
+| WORLD | Description |
+|---|---|
+| *(none)* | Default hexagonal arena |
+| `house` | House environment |
+| `maze` | Maze arena |
+| `empty` | Empty world |
+| `dock` | Dock/charging station arena |
+| `template` | Template maze |
 
-In a separate terminal (with ROS 2 sourced):
+### 2. Start the web dashboard (Terminal 2)
 
 ```bash
 cd src/sim_dashboard
-./run_dashboard.sh
+./run_dashboard.sh            # http://localhost:5000
+./run_dashboard.sh --ngrok    # public URL via ngrok
 ```
 
-Access the dashboard in your browser to view camera feeds, LIDAR data, and teleop controls.
+Dashboard features:
+- Live camera feeds (front, left, right)
+- LiDAR polar visualization
+- Keyboard / joystick / D-pad teleop (WASD + QE + Space)
+- Odometry readout
+- Navigation presets and custom distance/angle commands
+
+### 3. Start visual servoing (Terminal 3, optional)
+
+```bash
+./start_vs.sh
+```
+
+The robot will search for ArUco marker ID 42 and autonomously dock in front of it.
+
+### Clean restart
+
+```bash
+./reset_sim.sh [WORLD]    # kills all processes, restarts fresh
+```
+
+---
 
 ## Packages
 
-- **turtlebot3_simulations** — TurtleBot3 Gazebo launch files and worlds
-- **sim_dashboard** — Flask-based web dashboard for robot monitoring and control
+| Package | Type | Description |
+|---|---|---|
+| `turtlebot3_gazebo` | ament_cmake (C++) | Gazebo worlds, models, launch files, LIDAR drive node |
+| `turtlebot3_fake_node` | ament_cmake (C++) | Fake odometry for offline testing |
+| `tb3_cv` | ament_python | ArUco marker detection + visual servoing controller |
+| `sim_dashboard` | plain Python | Flask web dashboard (not a ROS package) |
+
+---
+
+## Key Topics
+
+| Topic | Type | Notes |
+|---|---|---|
+| `/cmd_vel` | Twist | Send velocity commands to the robot |
+| `/scan` | LaserScan | 360° LIDAR |
+| `/odom` | Odometry | Position and velocity |
+| `/camera_front/image_raw` | Image | Front camera |
+| `/camera_left/image_raw` | Image | Left camera |
+| `/camera_right/image_raw` | Image | Right camera |
+| `/aruco_debug/image_raw` | Image | ArUco detection overlay |
+
+---
+
+## Quick Commands
+
+```bash
+# Source environment
+source /opt/ros/humble/setup.bash && source ~/sim_ws/install/setup.bash
+
+# List running nodes
+ros2 node list
+
+# Drive forward manually
+ros2 topic pub --once /cmd_vel geometry_msgs/msg/Twist \
+  "{linear: {x: 0.1}, angular: {z: 0.0}}"
+
+# Stop the robot
+ros2 topic pub --once /cmd_vel geometry_msgs/msg/Twist \
+  "{linear: {x: 0.0}, angular: {z: 0.0}}"
+
+# Build a single package
+colcon build --symlink-install --packages-select tb3_cv
+```
+
+---
+
+See [llms.txt](llms.txt) for the full technical reference.

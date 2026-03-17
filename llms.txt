@@ -1,0 +1,378 @@
+# sim_ws — LLM Context File
+# CDE2310 TurtleBot3 ROS 2 Simulation Workspace
+# This file gives an AI assistant complete working knowledge of this repo.
+
+---
+
+## WHAT THIS WORKSPACE IS
+
+A ROS 2 Humble + Gazebo simulation workspace for a TurtleBot3 Burger robot.
+Course: CDE2310. The robot runs in a simulated Gazebo environment and is
+controllable via a Flask web dashboard. It includes a computer-vision-based
+visual servoing module for autonomous ArUco marker docking.
+
+---
+
+## DIRECTORY LAYOUT
+
+```
+sim_ws/
+├── src/
+│   ├── turtlebot3_simulations/         # Upstream TurtleBot3 Gazebo package (ament_cmake)
+│   │   ├── turtlebot3_gazebo/          # Main sim package — worlds, models, launch files
+│   │   │   ├── launch/                 # All ROS 2 launch files (Python)
+│   │   │   ├── worlds/                 # Gazebo SDF world files
+│   │   │   ├── models/                 # SDF robot + environment models
+│   │   │   ├── urdf/                   # Robot URDF definitions
+│   │   │   ├── params/                 # Bridge YAML configs
+│   │   │   └── src/turtlebot3_drive.cpp  # C++ LIDAR obstacle-avoidance node
+│   │   ├── turtlebot3_fake_node/       # Offline testing without Gazebo
+│   │   └── turtlebot3_simulations/     # Metapackage
+│   ├── tb3_cv/                         # Custom Python package — ArUco visual servoing
+│   │   └── tb3_cv/aruco_pose_node.py   # Main visual servoing node
+│   └── sim_dashboard/                  # Flask web dashboard (NOT a ROS package)
+│       ├── dashboard.py                # Flask server + ROS 2 node (threaded)
+│       ├── run_dashboard.sh            # Launch script (optionally with ngrok)
+│       └── templates/index.html        # Browser UI
+├── build/                              # colcon build outputs (do not edit)
+├── install/                            # colcon install outputs (source this)
+├── log/                                # ROS 2 logs
+├── start_sim.sh                        # PRIMARY launcher — Gazebo + robot
+├── start_vs.sh                         # Start visual servoing node
+├── reset_sim.sh                        # Kill everything and restart clean
+└── llms.txt                            # This file
+```
+
+---
+
+## ROS 2 PACKAGES
+
+### turtlebot3_gazebo (ament_cmake, C++)
+- Launches Gazebo with the TurtleBot3 Burger, sensor bridges, and robot state publisher.
+- C++ node `turtlebot3_drive`: LIDAR-based autonomous obstacle avoidance.
+  - Subscribes: `/scan` (LaserScan), `/odom` (Odometry)
+  - Publishes: `/cmd_vel` (Twist)
+
+### turtlebot3_fake_node (ament_cmake, C++)
+- Simulates robot odometry and TF for offline testing (no Gazebo needed).
+
+### tb3_cv (ament_python, Python)
+- Entry point: `aruco_pose = tb3_cv.aruco_pose_node:main`
+- Node: `aruco_pose` — detects ArUco marker ID 42 (0.18 m square) and docks.
+  - Subscribes: `/camera_front/image_raw`, `/camera_front/camera_info`
+  - Publishes: `/cmd_vel`, `/aruco_debug/image_raw`
+  - State machine: SEARCHING → APPROACH → HEADING → DONE
+  - Parameters (hardcoded in node):
+    - `MARKER_SIZE = 0.18` m
+    - `TARGET_DIST = 0.30` m (dock point from marker)
+    - `K_LINEAR = 0.4`, `K_BEARING = 1.5`
+    - `MAX_LINEAR = 0.12` m/s, `MAX_ANGULAR = 0.5` rad/s
+
+### sim_dashboard (plain Python, not a ROS package)
+- Flask server (port 5000) + background ROS 2 node thread.
+- Streams camera feeds as MJPEG, visualizes LiDAR, accepts teleop commands.
+- REST API:
+  - GET  `/stream/<camera>` — MJPEG stream (camera: `front`, `left`, `right`)
+  - GET  `/api/odom`        — JSON odometry
+  - GET  `/api/scan`        — JSON LiDAR ranges
+  - POST `/api/cmd_vel`     — JSON `{linear: float, angular: float}`
+  - POST `/api/nav`         — JSON `{preset: str}` (see presets below)
+  - POST `/api/nav/custom`  — JSON `{linear, angular, duration}`
+
+---
+
+## KEY TOPICS
+
+| Topic | Type | Direction | Notes |
+|---|---|---|---|
+| `/cmd_vel` | Twist | ROS→Gazebo | Robot velocity command |
+| `/scan` | LaserScan | Gazebo→ROS | 360° LIDAR |
+| `/odom` | Odometry | Gazebo→ROS | Position + velocity |
+| `/camera_front/image_raw` | Image | Gazebo→ROS | Front camera |
+| `/camera_left/image_raw` | Image | Gazebo→ROS | Left camera |
+| `/camera_right/image_raw` | Image | Gazebo→ROS | Right camera |
+| `/camera_*/camera_info` | CameraInfo | Gazebo→ROS | Calibration |
+| `/tf` | TFMessage | Gazebo→ROS | Transforms |
+| `/joint_states` | JointState | Gazebo→ROS | Wheel joints |
+| `/imu` | Imu | Gazebo→ROS | IMU data |
+| `/aruco_debug/image_raw` | Image | tb3_cv→ROS | ArUco overlay |
+
+Bridges are configured in:
+`src/turtlebot3_simulations/turtlebot3_gazebo/params/turtlebot3_burger_bridge.yaml`
+
+---
+
+## LAUNCH FILES
+
+All in `src/turtlebot3_simulations/turtlebot3_gazebo/launch/`:
+
+| File | World / Purpose |
+|---|---|
+| `turtlebot3_world.launch.py` | Default hexagonal arena |
+| `turtlebot3_house.launch.py` | House environment |
+| `empty_world.launch.py` | Empty world |
+| `arena_dock.launch.py` | Dock/charging station arena |
+| `arena_maze.launch.py` | Maze arena |
+| `arena_template_maze.launch.py` | Template maze |
+| `spawn_turtlebot3.launch.py` | Robot spawner + ROS-Gazebo bridge |
+| `robot_state_publisher.launch.py` | TF2 + joint state publisher |
+| `rviz2.launch.py` | RViz2 visualization |
+
+Every world launch file ultimately calls `spawn_turtlebot3.launch.py` which:
+1. Starts ros_gz_bridge with the burger bridge YAML.
+2. Publishes robot TF.
+3. Spawns the robot URDF into Gazebo.
+
+---
+
+## HOW TO BUILD
+
+```bash
+cd ~/sim_ws
+source /opt/ros/humble/setup.bash
+colcon build --symlink-install
+source install/setup.bash
+```
+
+`--symlink-install` is important: Python nodes are symlinked so edits take
+effect immediately without rebuilding.
+
+To build only one package:
+```bash
+colcon build --symlink-install --packages-select tb3_cv
+```
+
+---
+
+## HOW TO RUN
+
+### 1. Start the Gazebo simulation (Terminal 1)
+
+```bash
+cd ~/sim_ws
+./start_sim.sh [WORLD]
+```
+
+WORLD options: `world` (default), `house`, `maze`, `empty`, `dock`, `template`, `dashboard`
+
+What `start_sim.sh` does:
+- Strips conda from PATH (uses system Python for ROS).
+- Rebuilds the workspace with colcon.
+- Sources `/opt/ros/humble/setup.bash` and `install/setup.bash`.
+- Sets `TURTLEBOT3_MODEL=burger` and `GZ_SIM_RESOURCE_PATH`.
+- Launches the appropriate `*.launch.py` file.
+
+### 2. Start the web dashboard (Terminal 2)
+
+```bash
+cd ~/sim_ws/src/sim_dashboard
+./run_dashboard.sh            # local only at http://localhost:5000
+./run_dashboard.sh --ngrok    # expose publicly via ngrok tunnel
+```
+
+Or manually:
+```bash
+source /opt/ros/humble/setup.bash
+source ~/sim_ws/install/setup.bash
+python3 dashboard.py
+```
+
+### 3. Start visual servoing (Terminal 3, optional)
+
+```bash
+cd ~/sim_ws
+./start_vs.sh
+```
+
+What it does:
+- Rebuilds `tb3_cv` with colcon.
+- Runs `ros2 run tb3_cv aruco_pose`.
+- Robot will rotate searching for ArUco marker ID 42, then autonomously dock.
+
+### 4. Clean restart
+
+```bash
+./reset_sim.sh [WORLD]
+```
+
+Kills all gazebo, ros2, and bridge processes, then restarts the simulation.
+
+---
+
+## HOW TO ADD OR MODIFY CODE
+
+### Add a new Python ROS node to tb3_cv
+
+1. Create file at `src/tb3_cv/tb3_cv/my_node.py` with a `main()` function.
+2. Register it in `src/tb3_cv/setup.py`:
+   ```python
+   entry_points={
+       'console_scripts': [
+           'aruco_pose = tb3_cv.aruco_pose_node:main',
+           'my_node = tb3_cv.my_node:main',   # add this
+       ],
+   },
+   ```
+3. Rebuild and run:
+   ```bash
+   colcon build --symlink-install --packages-select tb3_cv
+   ros2 run tb3_cv my_node
+   ```
+
+### Add a new Gazebo world
+
+1. Create an SDF file at `src/turtlebot3_simulations/turtlebot3_gazebo/worlds/my_world.world`.
+2. Create a launch file at `src/turtlebot3_simulations/turtlebot3_gazebo/launch/my_world.launch.py`
+   (copy an existing one and change the world path).
+3. Register the world in `CMakeLists.txt` under `install(DIRECTORY worlds ...)`.
+4. Add a case to `start_sim.sh`:
+   ```bash
+   myworld) ros2 launch turtlebot3_gazebo my_world.launch.py ;;
+   ```
+
+### Edit the web dashboard
+
+`src/sim_dashboard/dashboard.py` is a plain Python file (not a ROS package).
+Edit it directly. No rebuild needed — restart `dashboard.py` to pick up changes.
+Frontend template is at `src/sim_dashboard/templates/index.html`.
+
+### Modify the ArUco node
+
+`src/tb3_cv/tb3_cv/aruco_pose_node.py` — edit directly.
+Because of `--symlink-install`, changes are live. Just restart the node:
+```bash
+ros2 run tb3_cv aruco_pose
+```
+
+---
+
+## ENVIRONMENT VARIABLES
+
+| Variable | Value | Set by |
+|---|---|---|
+| `TURTLEBOT3_MODEL` | `burger` | `start_sim.sh` |
+| `GZ_SIM_RESOURCE_PATH` | path to models dir | `start_sim.sh` |
+| `ROS_DOMAIN_ID` | not set (default 0) | — |
+
+---
+
+## COMMON COMMANDS (ready to copy-paste)
+
+```bash
+# Source ROS + workspace
+source /opt/ros/humble/setup.bash && source ~/sim_ws/install/setup.bash
+
+# List all running nodes
+ros2 node list
+
+# Echo velocity commands
+ros2 topic echo /cmd_vel
+
+# Echo LIDAR
+ros2 topic echo /scan
+
+# Publish a velocity command manually (drive forward 0.1 m/s for 2 s)
+ros2 topic pub --once /cmd_vel geometry_msgs/msg/Twist \
+  "{linear: {x: 0.1}, angular: {z: 0.0}}"
+
+# Stop the robot
+ros2 topic pub --once /cmd_vel geometry_msgs/msg/Twist \
+  "{linear: {x: 0.0}, angular: {z: 0.0}}"
+
+# Check topic list
+ros2 topic list
+
+# Show topic info
+ros2 topic info /scan
+
+# Run a specific launch file directly
+ros2 launch turtlebot3_gazebo turtlebot3_world.launch.py
+
+# Build only tb3_cv
+colcon build --symlink-install --packages-select tb3_cv
+
+# Build only turtlebot3_gazebo
+colcon build --symlink-install --packages-select turtlebot3_gazebo
+
+# View RViz
+ros2 launch turtlebot3_gazebo rviz2.launch.py
+```
+
+---
+
+## DEPENDENCIES
+
+### System (apt)
+```
+ros-humble-desktop
+ros-humble-turtlebot3-msgs
+ros-humble-cv-bridge
+ros-humble-ros-gz-bridge
+ros-humble-ros-gz-sim
+ros-humble-ros-gz-image
+```
+
+### Python (pip)
+```
+flask
+opencv-python   # provides cv2 and cv2.aruco
+numpy
+```
+
+---
+
+## KNOWN QUIRKS
+
+- **Conda conflicts**: `start_sim.sh` strips conda from PATH. If you run
+  ROS commands manually, make sure system Python is used (`/usr/bin/python3`),
+  not a conda env Python.
+- **Bridge YAML**: If you change topic names, update
+  `params/turtlebot3_burger_bridge.yaml` to match.
+- **ArUco module**: Requires `opencv-contrib-python` OR the `cv2.aruco`
+  module available via `ros-humble-cv-bridge`'s OpenCV. If `cv2.aruco`
+  is missing, install `pip install opencv-contrib-python`.
+- **Dashboard ROS thread**: `dashboard.py` spins a ROS 2 node in a daemon
+  thread. If Gazebo is not running, the dashboard still starts but sensor
+  data will be empty.
+- **Port 5000**: The dashboard uses port 5000. If it's in use, edit
+  `dashboard.py` line `app.run(port=5000)`.
+
+---
+
+## ARCHITECTURE OVERVIEW
+
+```
+Gazebo Simulation
+      │  (GZ topics)
+      ▼
+ ros_gz_bridge ←── turtlebot3_burger_bridge.yaml
+      │  (ROS 2 topics)
+      ├─────────────────────────────────────┐
+      ▼                                     ▼
+ turtlebot3_drive              aruco_pose / dashboard
+ (LIDAR obstacle avoid)        (vision servoing / web UI)
+      │                                     │
+      └──────────────► /cmd_vel ◄───────────┘
+                           │
+                           ▼
+                    ros_gz_bridge → Gazebo → robot moves
+```
+
+Only one node should publish `/cmd_vel` at a time to avoid conflicts.
+Kill `turtlebot3_drive` before running `aruco_pose` or dashboard teleop.
+
+---
+
+## FILE QUICK-REFERENCE
+
+| What you want to change | File |
+|---|---|
+| ArUco detection logic | `src/tb3_cv/tb3_cv/aruco_pose_node.py` |
+| Dashboard UI | `src/sim_dashboard/templates/index.html` |
+| Dashboard server/API | `src/sim_dashboard/dashboard.py` |
+| Gazebo world SDF | `src/turtlebot3_simulations/turtlebot3_gazebo/worlds/*.world` |
+| Launch a world | `src/turtlebot3_simulations/turtlebot3_gazebo/launch/*.launch.py` |
+| ROS↔Gazebo bridge | `src/turtlebot3_simulations/turtlebot3_gazebo/params/turtlebot3_burger_bridge.yaml` |
+| Robot URDF | `src/turtlebot3_simulations/turtlebot3_gazebo/urdf/turtlebot3_burger.urdf` |
+| Obstacle avoidance | `src/turtlebot3_simulations/turtlebot3_gazebo/src/turtlebot3_drive.cpp` |
+| Startup scripts | `start_sim.sh`, `start_vs.sh`, `reset_sim.sh` |
